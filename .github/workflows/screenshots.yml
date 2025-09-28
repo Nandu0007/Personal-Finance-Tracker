@@ -1,0 +1,73 @@
+name: Capture and embed screenshots
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies (server)
+        working-directory: server
+        run: npm ci
+
+      - name: Install dependencies (web)
+        working-directory: web
+        run: npm ci
+
+      - name: Build web
+        working-directory: web
+        run: npm run build
+
+      - name: Start API server
+        working-directory: server
+        run: nohup npm start &
+
+      - name: Start web preview
+        working-directory: web
+        run: nohup npm run preview -- --port 4173 &
+
+      - name: Wait for web to be ready
+        run: |
+          for i in {1..60}; do
+            if curl -sSf http://localhost:4173 >/dev/null; then echo ready; exit 0; fi
+            sleep 2
+          done
+          echo "Web preview did not start in time" && exit 1
+
+      - name: Capture screenshots and embed in README
+        working-directory: web
+        env:
+          BASE_URL: http://localhost:4173
+          MAKE_GIF: '1'
+        run: npm run capture
+
+      - name: Commit and push screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/screenshots web/README.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci: update screenshots and embed in README"
+            git push
+          fi

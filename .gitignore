@@ -1,0 +1,18 @@
+# Ignore Node.js dependencies and build outputs
+node_modules/
+dist/
+build/
+
+# Environment files
+.env
+.env.*
+*.local
+
+# Logs and caches
+*.log
+logs/
+.cache/
+tmp/
+
+# macOS
+.DS_Store
